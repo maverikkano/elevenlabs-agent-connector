@@ -1,6 +1,5 @@
 import logging
 import uuid
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from app.models import (
     InitiateCallRequest,
