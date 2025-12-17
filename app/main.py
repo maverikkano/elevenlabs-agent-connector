@@ -1,0 +1,105 @@
+import logging
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.routers import webhooks
+from app.models import ErrorResponse
+
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper()),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+# Create FastAPI application
+app = FastAPI(
+    title="ElevenLabs Agent Connector",
+    description="FastAPI service for connecting external dialers to ElevenLabs conversational AI agents",
+    version="1.0.0",
+    docs_url="/docs" if settings.is_development else None,
+    redoc_url="/redoc" if settings.is_development else None,
+)
+
+# Add CORS middleware if in development
+if settings.is_development:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    logger.info("CORS enabled for development")
+
+# Include routers
+app.include_router(webhooks.router, tags=["webhooks"])
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Run on application startup."""
+    logger.info("=" * 60)
+    logger.info("ElevenLabs Agent Connector Starting")
+    logger.info("=" * 60)
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Log Level: {settings.log_level}")
+    logger.info(f"Host: {settings.host}")
+    logger.info(f"Port: {settings.port}")
+    logger.info(f"API Keys Configured: {len(settings.allowed_api_keys)}")
+    logger.info("=" * 60)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Run on application shutdown."""
+    logger.info("ElevenLabs Agent Connector Shutting Down")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler for unhandled errors.
+
+    Args:
+        request: The request that caused the error
+        exc: The exception that was raised
+
+    Returns:
+        JSONResponse: Error response
+    """
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+
+    error_response = ErrorResponse(
+        error="Internal server error",
+        detail=str(exc) if settings.is_development else "An unexpected error occurred"
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content=error_response.model_dump()
+    )
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "service": "ElevenLabs Agent Connector",
+        "version": "1.0.0",
+        "status": "running"
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.is_development,
+        log_level=settings.log_level.lower()
+    )
