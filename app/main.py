@@ -6,7 +6,6 @@ from app.config import settings
 from app.routers import webhooks
 from app.models import ErrorResponse
 
-# Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -14,7 +13,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Create FastAPI application
 app = FastAPI(
     title="ElevenLabs Agent Connector",
     description="FastAPI service for connecting external dialers to ElevenLabs conversational AI agents",
@@ -23,7 +21,6 @@ app = FastAPI(
     redoc_url="/redoc" if settings.is_development else None,
 )
 
-# Add CORS middleware if in development
 if settings.is_development:
     app.add_middleware(
         CORSMiddleware,
@@ -34,13 +31,11 @@ if settings.is_development:
     )
     logger.info("CORS enabled for development")
 
-# Include routers
 app.include_router(webhooks.router, tags=["webhooks"])
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Run on application startup."""
     logger.info("=" * 60)
     logger.info("ElevenLabs Agent Connector Starting")
     logger.info("=" * 60)
@@ -54,22 +49,11 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Run on application shutdown."""
     logger.info("ElevenLabs Agent Connector Shutting Down")
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Global exception handler for unhandled errors.
-
-    Args:
-        request: The request that caused the error
-        exc: The exception that was raised
-
-    Returns:
-        JSONResponse: Error response
-    """
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
 
     error_response = ErrorResponse(
@@ -85,7 +69,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "service": "ElevenLabs Agent Connector",
         "version": "1.0.0",
