@@ -4,6 +4,7 @@ import json
 import asyncio
 import base64
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, WebSocket, WebSocketDisconnect, Response
+from twilio.rest import Client
 from app.models import (
     InitiateCallRequest,
     InitiateCallResponse,
@@ -100,6 +101,100 @@ async def initiate_call(
 
 # Twilio Integration Endpoints
 
+@router.post("/twilio/outbound-call")
+async def initiate_outbound_call(
+    request: InitiateCallRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Initiate an outbound call via Twilio to a customer
+
+    Args:
+        request: Contains agent_id, session_id, and metadata with customer info
+
+    Returns:
+        Response with call SID and status
+    """
+    try:
+        # Extract customer data from request
+        metadata = request.metadata or {}
+        dynamic_variables = metadata.get("dynamic_variables", {})
+        to_number = metadata.get("to_number")
+
+        if not to_number:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="to_number is required in metadata"
+            )
+
+        # Validate Twilio credentials
+        if not settings.twilio_account_sid or not settings.twilio_auth_token or not settings.twilio_phone_number:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Twilio credentials not configured"
+            )
+
+        # Initialize Twilio client
+        twilio_client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+
+        # Determine WebSocket URL
+        protocol = "wss" if settings.environment == "production" else "ws"
+        host = settings.host if settings.host != "0.0.0.0" else "localhost"
+        websocket_url = f"{protocol}://{host}:{settings.port}/twilio/media-stream"
+
+        logger.info(f"📡 WebSocket URL for Twilio: {websocket_url}")
+        logger.info(f"🔧 Environment: {settings.environment}, Host: {settings.host}, Port: {settings.port}")
+
+        # Build TwiML with customer data as Stream parameters
+        parameters_xml = ""
+        for key, value in dynamic_variables.items():
+            # Convert boolean to string
+            if isinstance(value, bool):
+                value = "true" if value else "false"
+            parameters_xml += f'<Parameter name="{key}" value="{value}" />\n            '
+
+        # Add agent_id as parameter
+        parameters_xml += f'<Parameter name="agent_id" value="{request.agent_id}" />\n            '
+        parameters_xml += f'<Parameter name="to_number" value="{to_number}" />'
+
+        twiml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="{websocket_url}">
+            {parameters_xml}
+        </Stream>
+    </Connect>
+</Response>'''
+
+        logger.info(f"📄 Generated TwiML:\n{twiml}")
+
+        # Make outbound call
+        call = twilio_client.calls.create(
+            from_=settings.twilio_phone_number,
+            to=to_number,
+            twiml=twiml
+        )
+
+        logger.info(f"✅ Outbound call initiated - CallSid: {call.sid}, To: {to_number}")
+
+        return {
+            "success": True,
+            "call_sid": call.sid,
+            "to": to_number,
+            "status": call.status,
+            "message": "Outbound call initiated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initiating outbound call: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate outbound call: {str(e)}"
+        )
+
+
 @router.post("/twilio/incoming-call")
 async def twilio_incoming_call(
     From: str = Form(...),
@@ -167,7 +262,8 @@ async def twilio_media_stream(websocket: WebSocket):
     Handles bidirectional audio streaming between Twilio and ElevenLabs
     """
     await websocket.accept()
-    logger.info("Twilio WebSocket connection established")
+    logger.info("🔌 Twilio WebSocket connection established")
+    logger.info(f"📍 WebSocket client: {websocket.client}")
 
     call_sid = None
     stream_sid = None
@@ -189,10 +285,39 @@ async def twilio_media_stream(websocket: WebSocket):
                 call_sid = start_data.get("callSid")
                 stream_sid = start_data.get("streamSid")
 
-                logger.info(f"Media stream started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+                # Extract custom parameters from Stream (for outbound calls)
+                custom_parameters = start_data.get("customParameters", {})
 
-                # Get stored context
+                logger.info(f"🎬 Media stream started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+                logger.info(f"📦 Start data received: {start_data}")
+
+                # Try to get stored context (for inbound calls)
                 context = get_call_context(call_sid)
+
+                # If no stored context, check custom parameters (for outbound calls)
+                if not context and custom_parameters:
+                    logger.info(f"Using custom parameters from outbound call: {custom_parameters}")
+
+                    # Extract agent_id from parameters
+                    agent_id = custom_parameters.get("agent_id", "agent_7201keyx3brmfk68gdwytc6a4tna")
+
+                    # Build dynamic variables from custom parameters
+                    dynamic_variables = {}
+                    for key, value in custom_parameters.items():
+                        if key != "agent_id":
+                            # Convert string booleans back to actual booleans
+                            if value == "true":
+                                dynamic_variables[key] = True
+                            elif value == "false":
+                                dynamic_variables[key] = False
+                            else:
+                                dynamic_variables[key] = value
+
+                    context = {
+                        "agent_id": agent_id,
+                        "dynamic_variables": dynamic_variables
+                    }
+
                 if not context:
                     logger.error(f"No context found for call {call_sid}")
                     await websocket.close()
@@ -203,17 +328,21 @@ async def twilio_media_stream(websocket: WebSocket):
                 dynamic_variables = context.get("dynamic_variables")
 
                 # Connect to ElevenLabs
-                logger.info(f"Connecting to ElevenLabs agent {agent_id}")
+                logger.info(f"🤖 Connecting to ElevenLabs agent {agent_id}")
                 signed_url = await elevenlabs_service.get_signed_url(agent_id)
+                logger.info(f"🔗 ElevenLabs WebSocket URL: {signed_url}")
+
                 elevenlabs_ws = await elevenlabs_service.create_websocket_connection(signed_url)
+                logger.info(f"✅ Connected to ElevenLabs WebSocket")
 
                 # Send initialization message to ElevenLabs
                 init_message = {
                     "type": "conversation_initiation_client_data",
                     "dynamic_variables": dynamic_variables or {}
                 }
+                logger.info(f"📤 Sending initialization with dynamic variables: {dynamic_variables}")
                 await elevenlabs_ws.send(json.dumps(init_message))
-                logger.info("Sent initialization to ElevenLabs")
+                logger.info("✅ Sent initialization to ElevenLabs")
 
                 # Start background task to receive from ElevenLabs
                 asyncio.create_task(

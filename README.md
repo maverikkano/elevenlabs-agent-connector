@@ -1,12 +1,17 @@
 # ElevenLabs Agent Connector
 
-FastAPI service that connects external dialers (like N8N) to ElevenLabs conversational AI agents. The service receives webhook calls, creates signed ElevenLabs URLs, and initiates WebSocket-based voice conversations using local microphone input.
+FastAPI service that connects external dialers and telephony systems to ElevenLabs conversational AI agents. Supports both local testing with microphone input and production deployments with Twilio integration for real phone calls.
 
 ## Features
 
 - **Webhook Integration**: Receive calls from N8N and external dialers
 - **ElevenLabs Integration**: Automatically generate signed URLs for agent conversations
-- **Real-time Audio**: WebSocket-based audio streaming with local microphone
+- **Real-time Audio**: WebSocket-based audio streaming
+- **Twilio Integration**:
+  - ✅ **Inbound calls**: Customers call your Twilio number → AI agent
+  - ✅ **Outbound calls**: System triggers calls to customers → AI agent
+  - ✅ Audio format conversion (mu-law 8kHz ↔ PCM 16kHz)
+  - ✅ Dynamic customer context injection
 - **API Key Authentication**: Secure endpoints with API key validation
 - **Background Processing**: Non-blocking audio streaming with FastAPI background tasks
 - **Comprehensive Logging**: Structured logging for debugging and monitoring
@@ -123,11 +128,11 @@ Check if the service is running.
 }
 ```
 
-### Initiate Call
+### Initiate Call (Local Testing)
 
 **POST** `/webhook/initiate-call`
 
-Initiate a conversation with an ElevenLabs agent.
+Initiate a conversation with an ElevenLabs agent using local microphone/speaker. **For testing only.**
 
 **Headers:**
 ```
@@ -141,8 +146,10 @@ Content-Type: application/json
   "agent_id": "your_elevenlabs_agent_id",
   "session_id": "optional_session_identifier",
   "metadata": {
-    "caller_id": "+1234567890",
-    "custom_field": "value"
+    "dynamic_variables": {
+      "name": "Customer Name",
+      "custom_field": "value"
+    }
   }
 }
 ```
@@ -158,25 +165,65 @@ Content-Type: application/json
 }
 ```
 
-**Response (Unauthorized - 401):**
+### Twilio Outbound Call
+
+**POST** `/twilio/outbound-call`
+
+Initiate an outbound call to a customer via Twilio. **For production use.**
+
+**Headers:**
+```
+X-API-Key: your_api_key_here
+Content-Type: application/json
+```
+
+**Request Body:**
 ```json
 {
-  "success": false,
-  "error": "Invalid or missing API key",
-  "detail": null,
-  "timestamp": "2025-12-17T12:00:00.000000"
+  "agent_id": "your_elevenlabs_agent_id",
+  "session_id": "optional_session_identifier",
+  "metadata": {
+    "to_number": "+919876543210",
+    "dynamic_variables": {
+      "name": "Customer Name",
+      "due_date": "30th January 2026",
+      "total_enr_amount": "25000",
+      "emi_eligibility": true
+    }
+  }
 }
 ```
 
-**Response (Error - 500):**
+**Response (Success - 200):**
 ```json
 {
-  "success": false,
-  "error": "Failed to connect to ElevenLabs",
-  "detail": "Error details here",
-  "timestamp": "2025-12-17T12:00:00.000000"
+  "success": true,
+  "call_sid": "CA1234567890abcdef",
+  "to": "+919876543210",
+  "status": "queued",
+  "message": "Outbound call initiated successfully"
 }
 ```
+
+**See [OUTBOUND_CALLING.md](OUTBOUND_CALLING.md) for complete documentation.**
+
+### Twilio Inbound Call
+
+**POST** `/twilio/incoming-call`
+
+Twilio webhook endpoint for inbound calls. Configure this in your Twilio phone number settings.
+
+**This endpoint is called by Twilio, not by you.**
+
+**See [TWILIO_INTEGRATION.md](TWILIO_INTEGRATION.md) for complete documentation.**
+
+### Twilio Media Stream
+
+**WebSocket** `/twilio/media-stream`
+
+WebSocket endpoint for Twilio Media Streams. Handles bidirectional audio streaming between Twilio and ElevenLabs.
+
+**This endpoint is connected to by Twilio, not by you.**
 
 ### API Documentation
 
