@@ -6,6 +6,11 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str
     api_keys: str  # Comma-separated
 
+    # Twilio settings (optional)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
+
     environment: str = "development"
     log_level: str = "INFO"
     host: str = "0.0.0.0"
