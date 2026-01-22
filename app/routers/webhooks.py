@@ -4,7 +4,15 @@ import json
 import asyncio
 import base64
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form, WebSocket, WebSocketDisconnect, Response
+from app.services.agents.elevenlabs import elevenlabs_service
 from twilio.rest import Client
+
+"""
+DEPRECATED: This router is deprecated in favor of the generic `app/routers/dialer.py`.
+It is tightly coupled to Twilio and the old ElevenLabs service.
+Future development should happen in `dialer.py`.
+"""
+
 from app.models import (
     InitiateCallRequest,
     InitiateCallResponse,
@@ -12,7 +20,7 @@ from app.models import (
     HealthResponse
 )
 from app.auth import verify_api_key
-from app.services import elevenlabs_service, audio_service
+from app.services import audio_service
 from app.services.twilio_service import (
     TwilioAudioConverter,
     TwilioMessageBuilder,
@@ -34,7 +42,7 @@ async def health_check():
 
 
 @router.post(
-    "/webhook/initiate-call",
+    "/webhook/initiate-test-call",
     response_model=InitiateCallResponse,
     responses={
         401: {"model": ErrorResponse},

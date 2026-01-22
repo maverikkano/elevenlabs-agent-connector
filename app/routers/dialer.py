@@ -16,7 +16,8 @@ from app.auth import verify_api_key
 from app.config import settings
 from app.services.dialers.registry import DialerRegistry
 from app.services.dialers.context import store_call_context, get_call_context, cleanup_call_context
-from app.services import elevenlabs_service
+from app.services.agents.registry import AgentRegistry
+from app.services.agents.types import AgentEventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def build_websocket_url(dialer_name: str) -> str:
     Returns:
         WebSocket URL
     """
-    protocol = "wss" if settings.environment == "production" else "ws"
+    protocol = "wss" # if settings.environment == "production" else "ws"
     host = settings.host if settings.host != "0.0.0.0" else "localhost"
     port = settings.port
 
@@ -206,7 +207,7 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
 
     call_id = None
     stream_id = None
-    elevenlabs_ws = None
+    agent_stream = None
 
     try:
         # Get dialer service
@@ -268,44 +269,37 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                 agent_id = context.get("agent_id")
                 dynamic_variables = context.get("dynamic_variables", {})
 
-                # Connect to ElevenLabs
-                logger.info(f"🤖 Connecting to ElevenLabs agent {agent_id}")
-                signed_url = await elevenlabs_service.get_signed_url(agent_id)
-                logger.info(f"🔗 ElevenLabs WebSocket URL: {signed_url}")
+                # Connect to Agent (Generic)
+                # TODO: Get agent provider from settings or context, defaulting to elevenlabs for now
+                agent_provider = "elevenlabs" 
+                
+                logger.info(f"🤖 Connecting to {agent_provider} agent {agent_id}")
+                agent_service_class = AgentRegistry.get(agent_provider)
+                agent_service = agent_service_class()
+                
+                # Connect and get stream
+                agent_stream = await agent_service.connect(agent_id, dynamic_variables)
+                logger.info(f"✅ Connected to Agent Stream")
+                
+                # Initialize agent (send config)
+                await agent_stream.initialize()
+                logger.info("✅ Agent initialized")
 
-                elevenlabs_ws = await elevenlabs_service.create_websocket_connection(signed_url)
-                logger.info(f"✅ Connected to ElevenLabs WebSocket")
-
-                # Send initialization message to ElevenLabs
-                init_message = {
-                    "type": "conversation_initiation_client_data",
-                    "dynamic_variables": dynamic_variables
-                }
-                logger.info(f"📤 Sending initialization with dynamic variables: {dynamic_variables}")
-                await elevenlabs_ws.send(json.dumps(init_message))
-                logger.info("✅ Sent initialization to ElevenLabs")
-
-                # Start background task to receive from ElevenLabs
+                # Start background task to receive from Agent
                 asyncio.create_task(
-                    receive_from_elevenlabs(elevenlabs_ws, websocket, stream_id, dialer)
+                    receive_from_agent(agent_stream, websocket, stream_id, dialer)
                 )
 
             elif event_type == "media":
                 # Audio from caller
                 audio_payload = parsed.get("audio_payload")
 
-                if audio_payload and elevenlabs_ws:
+                if audio_payload and agent_stream:
                     # Convert dialer audio to PCM using dialer's converter
                     pcm_audio = dialer.audio_converter.dialer_to_pcm(audio_payload)
 
-                    # Encode to base64 for ElevenLabs
-                    pcm_base64 = base64.b64encode(pcm_audio).decode('utf-8')
-
-                    # Send to ElevenLabs
-                    elevenlabs_message = {
-                        "user_audio_chunk": pcm_base64
-                    }
-                    await elevenlabs_ws.send(json.dumps(elevenlabs_message))
+                    # Send PCM audio to Agent
+                    await agent_stream.send_audio(pcm_audio)
 
             elif event_type == "stop":
                 # Call ended
@@ -317,6 +311,18 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                 mark_name = parsed.get("mark_name")
                 logger.debug(f"Received mark: {mark_name}")
 
+            elif event_type == "dtmf":
+                # DTMF event (key press)
+                digit = parsed.get("digit")
+                logger.info(f"Received DTMF digit: {digit}")
+                # Optional: You could pass this to the agent if supported
+                # if agent_stream:
+                #     await agent_stream.send_dtmf(digit)
+
+            else:
+                # Unknown event
+                logger.warning(f"Received unknown event from dialer: {parsed}")
+
     except WebSocketDisconnect:
         logger.info(f"{dialer_name.capitalize()} WebSocket disconnected for call {call_id}")
     except ValueError as e:
@@ -325,9 +331,9 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
         logger.error(f"Error in {dialer_name} media stream: {e}", exc_info=True)
     finally:
         # Cleanup
-        if elevenlabs_ws:
+        if agent_stream:
             try:
-                await elevenlabs_ws.close()
+                await agent_stream.close()
             except:
                 pass
 
@@ -342,59 +348,46 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
         logger.info(f"Cleaned up resources for call {call_id}")
 
 
-async def receive_from_elevenlabs(elevenlabs_ws, dialer_ws, stream_id, dialer):
+async def receive_from_agent(agent_stream, dialer_ws, stream_id, dialer):
     """
-    Background task to receive audio from ElevenLabs and send to dialer
+    Background task to receive audio from Agent and send to dialer
 
     Args:
-        elevenlabs_ws: ElevenLabs WebSocket connection
+        agent_stream: AgentStream instance
         dialer_ws: Dialer WebSocket connection
         stream_id: Stream identifier
         dialer: Dialer service instance
     """
     try:
-        while True:
-            message = await elevenlabs_ws.recv()
+        async for event in agent_stream.receive():
+            
+            # Handle audio event
+            if event.type == AgentEventTypes.AUDIO:
+                pcm_bytes = event.data
+                
+                # Convert PCM to dialer format using dialer's converter
+                dialer_audio = dialer.audio_converter.pcm_to_dialer(pcm_bytes)
 
-            if isinstance(message, str):
-                data = json.loads(message)
+                # Build dialer message
+                dialer_message = dialer.message_builder.build_audio_message(
+                    stream_id, dialer_audio
+                )
 
-                # Handle audio from agent
-                if data.get("type") == "audio" and "audio_event" in data:
-                    audio_event = data["audio_event"]
-                    pcm_base64 = audio_event.get("audio_base_64")
+                # Send to dialer
+                await dialer_ws.send_text(json.dumps(dialer_message))
 
-                    if pcm_base64:
-                        # Decode PCM audio
-                        pcm_bytes = base64.b64decode(pcm_base64)
-
-                        # Convert PCM to dialer format using dialer's converter
-                        dialer_audio = dialer.audio_converter.pcm_to_dialer(pcm_bytes)
-
-                        # Build dialer message
-                        dialer_message = dialer.message_builder.build_audio_message(
-                            stream_id, dialer_audio
-                        )
-
-                        # Send to dialer
-                        await dialer_ws.send_text(json.dumps(dialer_message))
-
-                # Handle other ElevenLabs events
-                elif data.get("type") == "interruption_event":
-                    logger.info("User interrupted agent")
-
-                elif data.get("type") == "agent_response_event":
-                    response_text = data.get("agent_response_event", {}).get("response", "")
-                    logger.info(f"Agent response: {response_text}")
-
-                elif data.get("type") == "user_transcription_event":
-                    transcription = data.get("user_transcription_event", {}).get("user_transcription", "")
-                    logger.info(f"User said: {transcription}")
-
-                elif data.get("type") == "ping_event":
-                    # Respond to ping
-                    pong = {"type": "pong_event"}
-                    await elevenlabs_ws.send(json.dumps(pong))
+            # Handle text/transcription events
+            elif event.type == AgentEventTypes.TEXT:
+                logger.info(f"Agent response: {event.data}")
+            
+            elif event.type == AgentEventTypes.TRANSCRIPTION:
+                logger.info(f"Transcription ({event.metadata.get('source', 'unknown')}): {event.data}")
+                
+            elif event.type == AgentEventTypes.INTERRUPTION:
+                logger.info("User interrupted agent")
+                
+            elif event.type == AgentEventTypes.ERROR:
+                logger.error(f"Agent error: {event.data}")
 
     except Exception as e:
-        logger.error(f"Error receiving from ElevenLabs: {e}", exc_info=True)
+        logger.error(f"Error receiving from Agent: {e}", exc_info=True)
