@@ -3,8 +3,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import webhooks
+from app.routers import webhooks, dialer
 from app.models import ErrorResponse
+from app.services.dialers.registry import DialerRegistry
+from app.services.dialers.twilio.service import TwilioDialerService
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
@@ -31,7 +33,13 @@ if settings.is_development:
     )
     logger.info("CORS enabled for development")
 
+# Register dialer plugins
+DialerRegistry.register("twilio", TwilioDialerService)
+logger.info("Registered dialer plugins")
+
+# Include routers
 app.include_router(webhooks.router, tags=["webhooks"])
+app.include_router(dialer.router, tags=["dialer"])
 
 
 @app.on_event("startup")
@@ -44,6 +52,8 @@ async def startup_event():
     logger.info(f"Host: {settings.host}")
     logger.info(f"Port: {settings.port}")
     logger.info(f"API Keys Configured: {len(settings.allowed_api_keys)}")
+    logger.info(f"Default Dialer: {settings.default_dialer}")
+    logger.info(f"Registered Dialers: {', '.join(DialerRegistry.list_dialers())}")
     logger.info("=" * 60)
 
 
