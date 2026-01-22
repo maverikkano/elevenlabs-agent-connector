@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Test script to initiate an outbound Twilio call to a customer
+Test script to initiate an outbound call via any dialer
+
+The gateway now supports multiple dialers through a plugin architecture.
+Change the dialer name in the URL to use a different provider:
+- Twilio: http://localhost:8000/twilio/outbound-call
+- Plivo: http://localhost:8000/plivo/outbound-call (when implemented)
+- Exotel: http://localhost:8000/exotel/outbound-call (when implemented)
 """
 import requests
 import json
 
 # Your API configuration
-API_URL = "http://localhost:8000/twilio/outbound-call"
+API_URL = "http://localhost:8000/twilio/outbound-call"  # Change 'twilio' to use a different dialer
 API_KEY = "test_key_123"  # Replace with your actual API key from .env
 
 # Customer data

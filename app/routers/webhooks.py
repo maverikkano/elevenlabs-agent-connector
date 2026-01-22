@@ -99,15 +99,22 @@ async def initiate_call(
         )
 
 
-# Twilio Integration Endpoints
+# Twilio Integration Endpoints (DEPRECATED)
+# Use /{dialer_name}/outbound-call instead for dialer-agnostic approach
 
-@router.post("/twilio/outbound-call")
+@router.post("/twilio/outbound-call", deprecated=True)
 async def initiate_outbound_call(
     request: InitiateCallRequest,
     api_key: str = Depends(verify_api_key)
 ):
     """
-    Initiate an outbound call via Twilio to a customer
+    [DEPRECATED] Initiate an outbound call via Twilio to a customer
+
+    **This endpoint is deprecated. Use `/twilio/outbound-call` (without the prefix)
+    via the generic dialer router instead.**
+
+    New endpoint: `POST /{dialer_name}/outbound-call`
+    Example: `POST /twilio/outbound-call` (same path, different router)
 
     Args:
         request: Contains agent_id, session_id, and metadata with customer info
@@ -115,6 +122,7 @@ async def initiate_outbound_call(
     Returns:
         Response with call SID and status
     """
+    logger.warning("⚠️ DEPRECATED: /twilio/outbound-call endpoint is deprecated. Use /{dialer_name}/outbound-call instead")
     try:
         # Extract customer data from request
         metadata = request.metadata or {}
@@ -195,14 +203,20 @@ async def initiate_outbound_call(
         )
 
 
-@router.post("/twilio/incoming-call")
+@router.post("/twilio/incoming-call", deprecated=True)
 async def twilio_incoming_call(
     From: str = Form(...),
     To: str = Form(...),
     CallSid: str = Form(...)
 ):
     """
-    Twilio webhook endpoint - called when a call arrives
+    [DEPRECATED] Twilio webhook endpoint - called when a call arrives
+
+    **This endpoint is deprecated. Use `/twilio/incoming-call` (without the prefix)
+    via the generic dialer router instead.**
+
+    New endpoint: `POST /{dialer_name}/incoming-call`
+    Example: `POST /twilio/incoming-call` (same path, different router)
 
     Args:
         From: Caller's phone number
@@ -212,6 +226,7 @@ async def twilio_incoming_call(
     Returns:
         TwiML XML instructing Twilio to start media streaming
     """
+    logger.warning("⚠️ DEPRECATED: /twilio/incoming-call endpoint is deprecated. Use /{dialer_name}/incoming-call instead")
     logger.info(f"Incoming Twilio call - From: {From}, To: {To}, CallSid: {CallSid}")
 
     try:
@@ -255,13 +270,21 @@ async def twilio_incoming_call(
         return Response(content=error_twiml, media_type="application/xml")
 
 
-@router.websocket("/twilio/media-stream")
+@router.websocket("/twilio/media-stream", name="twilio_media_stream_deprecated")
 async def twilio_media_stream(websocket: WebSocket):
     """
-    Twilio Media Streams WebSocket endpoint
+    [DEPRECATED] Twilio Media Streams WebSocket endpoint
+
+    **This endpoint is deprecated. Use `/{dialer_name}/media-stream` instead
+    via the generic dialer router.**
+
+    New endpoint: `WS /{dialer_name}/media-stream`
+    Example: `WS /twilio/media-stream` (same path, different router)
+
     Handles bidirectional audio streaming between Twilio and ElevenLabs
     """
     await websocket.accept()
+    logger.warning("⚠️ DEPRECATED: /twilio/media-stream WebSocket is deprecated. Use /{dialer_name}/media-stream instead")
     logger.info("🔌 Twilio WebSocket connection established")
     logger.info(f"📍 WebSocket client: {websocket.client}")
 
