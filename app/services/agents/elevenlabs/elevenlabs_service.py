@@ -6,6 +6,12 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+"""
+DEPRECATED: This module is deprecated in favor of the new Agent Abstraction layer.
+Please use `app.services.agents.elevenlabs.service` instead.
+This file is kept for backward compatibility with `app/routers/webhooks.py`.
+"""
+
 ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1"
 
 

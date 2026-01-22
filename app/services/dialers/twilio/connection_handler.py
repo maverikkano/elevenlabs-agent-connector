@@ -47,6 +47,8 @@ class TwilioConnectionHandler(ConnectionHandler):
             return self._handle_stop(message)
         elif event_type == "mark":
             return self._handle_mark(message)
+        elif event_type == "dtmf":
+            return self._handle_dtmf(message)
         else:
             # Unknown event type
             return {
@@ -101,6 +103,17 @@ class TwilioConnectionHandler(ConnectionHandler):
             "event_type": "mark",
             "stream_id": message.get("streamSid"),
             "mark_name": mark_data.get("name")
+        }
+
+    def _handle_dtmf(self, message: Dict) -> Dict[str, Any]:
+        """Handle DTMF event"""
+        dtmf_data = message.get("dtmf", {})
+
+        return {
+            "event_type": "dtmf",
+            "stream_id": message.get("streamSid"),
+            "digit": dtmf_data.get("digit"),
+            "track": dtmf_data.get("track", "inbound")
         }
 
     async def extract_call_metadata(self, start_data: Dict) -> Dict:

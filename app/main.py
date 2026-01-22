@@ -7,6 +7,8 @@ from app.routers import webhooks, dialer
 from app.models import ErrorResponse
 from app.services.dialers.registry import DialerRegistry
 from app.services.dialers.twilio.service import TwilioDialerService
+from app.services.agents.registry import AgentRegistry
+from app.services.agents.elevenlabs.service import ElevenLabsAgentService
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
@@ -37,6 +39,10 @@ if settings.is_development:
 DialerRegistry.register("twilio", TwilioDialerService)
 logger.info("Registered dialer plugins")
 
+# Register agent plugins
+AgentRegistry.register("elevenlabs", ElevenLabsAgentService)
+logger.info("Registered agent plugins")
+
 # Include routers
 app.include_router(webhooks.router, tags=["webhooks"])
 app.include_router(dialer.router, tags=["dialer"])
@@ -54,6 +60,8 @@ async def startup_event():
     logger.info(f"API Keys Configured: {len(settings.allowed_api_keys)}")
     logger.info(f"Default Dialer: {settings.default_dialer}")
     logger.info(f"Registered Dialers: {', '.join(DialerRegistry.list_dialers())}")
+    logger.info(f"Default Agent: {settings.default_agent}")
+    logger.info(f"Registered Agents: {', '.join(AgentRegistry.list_agents())}")
     logger.info("=" * 60)
 
 

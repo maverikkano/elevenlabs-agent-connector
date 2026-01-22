@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     # Dialer configuration
     default_dialer: str = "twilio"  # Default dialer to use
 
+    # Agent configuration
+    default_agent: str = "elevenlabs"  # Default agent to use
+
     # Twilio settings (optional)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
