@@ -8,7 +8,7 @@ import logging
 import json
 import asyncio
 import base64
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, Response
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, Response, Form
 from fastapi.responses import PlainTextResponse
 
 from app.models import InitiateCallRequest
@@ -191,6 +191,19 @@ async def handle_incoming_call(
         error_response = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Service temporarily unavailable</Say><Hangup/></Response>'
         return Response(content=error_response, media_type="application/xml")
 
+    except ValueError as e:
+        logger.error(f"Dialer error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+    except Exception as e:
+        logger.error(f"Error handling incoming call: {e}", exc_info=True)
+        # Return error response in dialer format
+        error_response = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Service temporarily unavailable</Say><Hangup/></Response>'
+        return Response(content=error_response, media_type="application/xml")
+
 
 @router.websocket("/{dialer_name}/media-stream")
 async def media_stream(websocket: WebSocket, dialer_name: str):
@@ -270,8 +283,8 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                 dynamic_variables = context.get("dynamic_variables", {})
 
                 # Connect to Agent (Generic)
-                # TODO: Get agent provider from settings or context, defaulting to elevenlabs for now
-                agent_provider = "elevenlabs" 
+                # Get agent provider from settings or context
+                agent_provider = settings.default_agent
                 
                 logger.info(f"🤖 Connecting to {agent_provider} agent {agent_id}")
                 agent_service_class = AgentRegistry.get(agent_provider)

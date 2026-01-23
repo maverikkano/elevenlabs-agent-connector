@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Agent configuration
     default_agent: str = "elevenlabs"  # Default agent to use
 
+    # PredixionAI Voice settings
+    predixionai_api_url: str = "http://localhost:8000"
+    predixionai_api_key: str = ""
+
     # Twilio settings (optional)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
