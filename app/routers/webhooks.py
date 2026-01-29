@@ -130,7 +130,7 @@ async def initiate_outbound_call(
     Returns:
         Response with call SID and status
     """
-    logger.warning("⚠️ DEPRECATED: /twilio/outbound-call endpoint is deprecated. Use /{dialer_name}/outbound-call instead")
+    logger.warning(" DEPRECATED: /twilio/outbound-call endpoint is deprecated. Use /{dialer_name}/outbound-call instead")
     try:
         # Extract customer data from request
         metadata = request.metadata or {}
@@ -158,8 +158,8 @@ async def initiate_outbound_call(
         host = settings.host if settings.host != "0.0.0.0" else "localhost"
         websocket_url = f"{protocol}://{host}:{settings.port}/twilio/media-stream"
 
-        logger.info(f"📡 WebSocket URL for Twilio: {websocket_url}")
-        logger.info(f"🔧 Environment: {settings.environment}, Host: {settings.host}, Port: {settings.port}")
+        logger.info(f" WebSocket URL for Twilio: {websocket_url}")
+        logger.info(f" Environment: {settings.environment}, Host: {settings.host}, Port: {settings.port}")
 
         # Build TwiML with customer data as Stream parameters
         parameters_xml = ""
@@ -182,7 +182,7 @@ async def initiate_outbound_call(
     </Connect>
 </Response>'''
 
-        logger.info(f"📄 Generated TwiML:\n{twiml}")
+        logger.info(f" Generated TwiML:\n{twiml}")
 
         # Make outbound call
         call = twilio_client.calls.create(
@@ -234,7 +234,7 @@ async def twilio_incoming_call(
     Returns:
         TwiML XML instructing Twilio to start media streaming
     """
-    logger.warning("⚠️ DEPRECATED: /twilio/incoming-call endpoint is deprecated. Use /{dialer_name}/incoming-call instead")
+    logger.warning(" DEPRECATED: /twilio/incoming-call endpoint is deprecated. Use /{dialer_name}/incoming-call instead")
     logger.info(f"Incoming Twilio call - From: {From}, To: {To}, CallSid: {CallSid}")
 
     try:
@@ -292,9 +292,9 @@ async def twilio_media_stream(websocket: WebSocket):
     Handles bidirectional audio streaming between Twilio and ElevenLabs
     """
     await websocket.accept()
-    logger.warning("⚠️ DEPRECATED: /twilio/media-stream WebSocket is deprecated. Use /{dialer_name}/media-stream instead")
-    logger.info("🔌 Twilio WebSocket connection established")
-    logger.info(f"📍 WebSocket client: {websocket.client}")
+    logger.warning(" DEPRECATED: /twilio/media-stream WebSocket is deprecated. Use /{dialer_name}/media-stream instead")
+    logger.info(" Twilio WebSocket connection established")
+    logger.info(f" WebSocket client: {websocket.client}")
 
     call_sid = None
     stream_sid = None
@@ -319,8 +319,8 @@ async def twilio_media_stream(websocket: WebSocket):
                 # Extract custom parameters from Stream (for outbound calls)
                 custom_parameters = start_data.get("customParameters", {})
 
-                logger.info(f"🎬 Media stream started - CallSid: {call_sid}, StreamSid: {stream_sid}")
-                logger.info(f"📦 Start data received: {start_data}")
+                logger.info(f" Media stream started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+                logger.info(f" Start data received: {start_data}")
 
                 # Try to get stored context (for inbound calls)
                 context = get_call_context(call_sid)
@@ -359,9 +359,9 @@ async def twilio_media_stream(websocket: WebSocket):
                 dynamic_variables = context.get("dynamic_variables")
 
                 # Connect to ElevenLabs
-                logger.info(f"🤖 Connecting to ElevenLabs agent {agent_id}")
+                logger.info(f" Connecting to ElevenLabs agent {agent_id}")
                 signed_url = await elevenlabs_service.get_signed_url(agent_id)
-                logger.info(f"🔗 ElevenLabs WebSocket URL: {signed_url}")
+                logger.info(f" ElevenLabs WebSocket URL: {signed_url}")
 
                 elevenlabs_ws = await elevenlabs_service.create_websocket_connection(signed_url)
                 logger.info(f"✅ Connected to ElevenLabs WebSocket")
@@ -371,7 +371,7 @@ async def twilio_media_stream(websocket: WebSocket):
                     "type": "conversation_initiation_client_data",
                     "dynamic_variables": dynamic_variables or {}
                 }
-                logger.info(f"📤 Sending initialization with dynamic variables: {dynamic_variables}")
+                logger.info(f" Sending initialization with dynamic variables: {dynamic_variables}")
                 await elevenlabs_ws.send(json.dumps(init_message))
                 logger.info("✅ Sent initialization to ElevenLabs")
 

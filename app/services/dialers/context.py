@@ -22,7 +22,7 @@ def store_call_context(call_id: str, context: Dict) -> None:
         context: Context data to store
     """
     _call_contexts[call_id] = context
-    logger.info(f"📦 Stored context for call {call_id}")
+    logger.info(f"Stored context for call {call_id}")
 
 
 def get_call_context(call_id: str) -> Optional[Dict]:
@@ -37,9 +37,9 @@ def get_call_context(call_id: str) -> Optional[Dict]:
     """
     context = _call_contexts.get(call_id)
     if context:
-        logger.debug(f"📦 Retrieved context for call {call_id}")
+        logger.debug(f"Retrieved context for call {call_id}")
     else:
-        logger.debug(f"📦 No context found for call {call_id}")
+        logger.debug(f"No context found for call {call_id}")
     return context
 
 
@@ -52,13 +52,13 @@ def cleanup_call_context(call_id: str) -> None:
     """
     if call_id in _call_contexts:
         del _call_contexts[call_id]
-        logger.info(f"🗑️ Cleaned up context for call {call_id}")
+        logger.info(f"Cleaned up context for call {call_id}")
 
 
 def clear_all_contexts() -> None:
     """Clear all stored contexts (useful for testing)"""
     _call_contexts.clear()
-    logger.info("🗑️ Cleared all call contexts")
+    logger.info("Cleared all call contexts")
 
 
 def get_all_context_ids() -> list:

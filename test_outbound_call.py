@@ -53,8 +53,8 @@ try:
         print(f"Status: {result['status']}")
         print(f"To: {result['to']}")
     else:
-        print(f"❌ Error: {response.status_code}")
+        print(f"Error: {response.status_code}")
         print(response.text)
 
 except Exception as e:
-    print(f"❌ Exception: {e}")
+    print(f"Exception: {e}")

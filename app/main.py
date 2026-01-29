@@ -21,8 +21,8 @@ app = FastAPI(
     title="ElevenLabs Agent Connector",
     description="FastAPI service for connecting external dialers to ElevenLabs conversational AI agents",
     version="1.0.0",
-    docs_url="/docs" if settings.is_development else None,
-    redoc_url="/redoc" if settings.is_development else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 if settings.is_development:

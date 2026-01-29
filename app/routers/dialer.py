@@ -88,8 +88,8 @@ async def initiate_outbound_call(
         # Build WebSocket URL
         websocket_url = build_websocket_url(dialer_name)
 
-        logger.info(f"📡 WebSocket URL for {dialer_name}: {websocket_url}")
-        logger.info(f"📞 Initiating outbound call via {dialer_name} to {to_number}")
+        logger.info(f"WebSocket URL for {dialer_name}: {websocket_url}")
+        logger.info(f"Initiating outbound call via {dialer_name} to {to_number}")
 
         # Initiate call using dialer
         result = await dialer.initiate_outbound_call(
@@ -162,7 +162,7 @@ async def handle_incoming_call(
 
         # Generate a temporary call ID (will be replaced when WebSocket connects)
         # For now, we store with a placeholder
-        logger.info(f"📞 Incoming call via {dialer_name}, agent: {agent_id}")
+        logger.info(f" Incoming call via {dialer_name}, agent: {agent_id}")
 
         # Build WebSocket URL
         websocket_url = build_websocket_url(dialer_name)
@@ -173,7 +173,7 @@ async def handle_incoming_call(
             custom_params=None
         )
 
-        logger.info(f"📄 Returning connection response for {dialer_name}")
+        logger.info(f" Returning connection response for {dialer_name}")
 
         # Return appropriate content type based on dialer
         return Response(content=response_content, media_type="application/xml")
@@ -202,8 +202,8 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
         dialer_name: Name of the dialer (e.g., "twilio", "plivo")
     """
     await websocket.accept()
-    logger.info(f"🔌 {dialer_name.capitalize()} WebSocket connection established")
-    logger.info(f"📍 WebSocket client: {websocket.client}")
+    logger.info(f" {dialer_name.capitalize()} WebSocket connection established")
+    logger.info(f" WebSocket client: {websocket.client}")
 
     call_id = None
     stream_id = None
@@ -228,8 +228,8 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                 call_id = parsed.get("call_id")
                 stream_id = parsed.get("stream_id")
 
-                logger.info(f"🎬 Media stream started - CallID: {call_id}, StreamID: {stream_id}")
-                logger.info(f"📦 Parsed start data: {parsed}")
+                logger.info(f" Media stream started - CallID: {call_id}, StreamID: {stream_id}")
+                logger.info(f" Parsed start data: {parsed}")
 
                 # Try to get stored context (for incoming calls)
                 context = get_call_context(call_id)
@@ -270,25 +270,34 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                 dynamic_variables = context.get("dynamic_variables", {})
 
                 # Connect to Agent (Generic)
-                # TODO: Get agent provider from settings or context, defaulting to elevenlabs for now
-                agent_provider = "elevenlabs" 
+                # Get agent provider from settings or context
+                agent_provider = settings.default_agent
                 
-                logger.info(f"🤖 Connecting to {agent_provider} agent {agent_id}")
-                agent_service_class = AgentRegistry.get(agent_provider)
-                agent_service = agent_service_class()
+                logger.info(f" Selecting agent provider: {agent_provider}")
+                logger.info(f" Connecting to {agent_provider} agent {agent_id}")
                 
-                # Connect and get stream
-                agent_stream = await agent_service.connect(agent_id, dynamic_variables)
-                logger.info(f"✅ Connected to Agent Stream")
-                
-                # Initialize agent (send config)
-                await agent_stream.initialize()
-                logger.info("✅ Agent initialized")
+                try:
+                    agent_service_class = AgentRegistry.get(agent_provider)
+                    agent_service = agent_service_class()
+                    
+                    # Connect and get stream
+                    logger.info(f" Initiating connection to {agent_provider}...")
+                    agent_stream = await agent_service.connect(agent_id, dynamic_variables)
+                    logger.info(f"✅ Connected to Agent Stream for {agent_provider}")
+                    
+                    # Initialize agent (send config)
+                    logger.info(" Sending initialization to agent...")
+                    await agent_stream.initialize()
+                    logger.info("✅ Agent initialized successfully")
 
-                # Start background task to receive from Agent
-                asyncio.create_task(
-                    receive_from_agent(agent_stream, websocket, stream_id, dialer)
-                )
+                    # Start background task to receive from Agent
+                    asyncio.create_task(
+                        receive_from_agent(agent_stream, websocket, stream_id, dialer)
+                    )
+                except Exception as e:
+                    logger.error(f" Failed to connect/initialize agent: {e}", exc_info=True)
+                    await websocket.close()
+                    return
 
             elif event_type == "media":
                 # Audio from caller

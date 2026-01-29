@@ -74,6 +74,7 @@ class TwilioDialerService(DialerService):
                 "to_number": to_number,
                 **dynamic_variables
             }
+            logger.info(f"Custom parameters for TwiML: {custom_params}")
 
             # Build TwiML with Stream parameters
             twiml = self.message_builder.build_connection_response(
@@ -81,8 +82,8 @@ class TwilioDialerService(DialerService):
                 custom_params=custom_params
             )
 
-            logger.info(f"📞 Initiating Twilio call to {to_number}")
-            logger.info(f"📄 TwiML:\n{twiml}")
+            logger.info(f"Initiating Twilio call to {to_number}")
+            logger.info(f"TwiML:\n{twiml}")
 
             # Make outbound call
             call = client.calls.create(

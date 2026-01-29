@@ -70,7 +70,7 @@ def initiate_call(customer: Dict) -> bool:
     }
 
     try:
-        print(f"📞 Calling {customer['name']} at {customer['phone']}...")
+        print(f"Calling {customer['name']} at {customer['phone']}...")
 
         response = requests.post(API_URL, json=payload, headers=headers)
 
@@ -79,12 +79,12 @@ def initiate_call(customer: Dict) -> bool:
             print(f"   ✅ Success - Call SID: {result['call_sid']}")
             return True
         else:
-            print(f"   ❌ Failed - Status: {response.status_code}")
+            print(f"   Failed - Status: {response.status_code}")
             print(f"   Error: {response.text}")
             return False
 
     except Exception as e:
-        print(f"   ❌ Exception: {e}")
+        print(f"   Exception: {e}")
         return False
 
 
@@ -111,7 +111,7 @@ def main():
 
         # Wait before next call (except for last one)
         if i < len(customers):
-            print(f"   ⏳ Waiting {DELAY_BETWEEN_CALLS}s before next call...")
+            print(f"   Waiting {DELAY_BETWEEN_CALLS}s before next call...")
             time.sleep(DELAY_BETWEEN_CALLS)
 
         print()
@@ -121,8 +121,8 @@ def main():
     print("Campaign Summary")
     print("=" * 60)
     print(f"✅ Successful calls: {success_count}")
-    print(f"❌ Failed calls: {failure_count}")
-    print(f"📊 Success rate: {(success_count/len(customers)*100):.1f}%")
+    print(f"Failed calls: {failure_count}")
+    print(f"Success rate: {(success_count/len(customers)*100):.1f}%")
     print("=" * 60)
 
 
