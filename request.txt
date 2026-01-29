@@ -1,0 +1,17 @@
+For ElevenLabs agent
+{
+      "agent_id": "agent_7201keyx3brmfk68gdwytc6a4tna",
+      "session_id": "test-session-001",
+      "metadata": {
+        "to_number": "+918698760751",
+        "name": "Abhishek",
+        "due_date": "3rd January 2026",
+        "total_enr_amount": "25000",
+        "emi_eligibility" : true,
+        "waiver_eligible" : false,
+        "emi_eligible" : true
+      }
+   }
+
+For LiveKit agent
+    

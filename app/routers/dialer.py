@@ -246,7 +246,7 @@ async def media_stream(websocket: WebSocket, dialer_name: str):
                         # Build dynamic variables from custom parameters
                         dynamic_variables = {}
                         for key, value in custom_params.items():
-                            if key not in ["agent_id", "to_number"]:
+                            if key != "agent_id":  # Only exclude agent_id (it's passed separately)
                                 # Convert string booleans back to actual booleans
                                 if value == "true":
                                     dynamic_variables[key] = True

@@ -9,6 +9,7 @@ from app.services.dialers.registry import DialerRegistry
 from app.services.dialers.twilio.service import TwilioDialerService
 from app.services.agents.registry import AgentRegistry
 from app.services.agents.elevenlabs.service import ElevenLabsAgentService
+from app.services.agents.predixionai.service import PredixionAIAgentService
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
@@ -41,11 +42,13 @@ logger.info("Registered dialer plugins")
 
 # Register agent plugins
 AgentRegistry.register("elevenlabs", ElevenLabsAgentService)
+AgentRegistry.register("predixionai", PredixionAIAgentService)
 logger.info("Registered agent plugins")
 
 # Include routers
-app.include_router(webhooks.router, tags=["webhooks"])
+# NOTE: dialer router must come FIRST to take precedence over deprecated webhooks endpoints
 app.include_router(dialer.router, tags=["dialer"])
+app.include_router(webhooks.router, tags=["webhooks"])
 
 
 @app.on_event("startup")

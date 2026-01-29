@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     default_dialer: str = "twilio"  # Default dialer to use
 
     # Agent configuration
-    default_agent: str = "elevenlabs"  # Default agent to use
+    default_agent: str = "predixionai"  # Default agent to use
 
     # PredixionAI Voice settings
     predixionai_api_url: str = "http://localhost:8001"
